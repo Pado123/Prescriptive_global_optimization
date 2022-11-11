@@ -1,0 +1,28 @@
+,9
+SR_Number,1-731792134
+Status,Accepted
+ACTIVITY,In Progress
+Involved_ST_Function_Div,missing
+Involved_Org_line_3,Org line V11
+Involved_ST,V50 2nd
+SR_Latest_Impact,Medium
+Product,PROD616
+Country,be
+Owner_Country,United Kingdom
+time_from_start,4.641
+time_from_previous_event(start),1.346
+daytime,42944.054
+weekday,Friday
+# ACTIVITY=In Progress,5
+# ACTIVITY=Awaiting Assignment,4
+# ACTIVITY=Resolved,0
+# ACTIVITY=Assigned,0
+# ACTIVITY=Closed,0
+# ACTIVITY=Wait - User,0
+# ACTIVITY=Wait - Implementation,0
+# ACTIVITY=Wait,0
+# ACTIVITY=Wait - Vendor,0
+# ACTIVITY=In Call,0
+# ACTIVITY=Wait - Customer,0
+# ACTIVITY=Unmatched,0
+# ACTIVITY=Cancelled,0
