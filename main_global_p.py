@@ -4,7 +4,7 @@ import os
 import shutil
 import warnings
 import pickle
-
+import time
 # REFACTOR
 from os.path import join
 
@@ -20,6 +20,7 @@ import next_act
 import utils
 from IO import read, folders, create_folders
 from load_dataset import prepare_dataset
+print(f'THE INITIAL TIME IS {time.time()}')
 
 experiment_name = 'experiment_files'
 case_id_name = 'REQUEST_ID'
@@ -47,8 +48,6 @@ for act in activity_list:
     for idx in range(len(roles)):
         if act in roles[idx][0]:
             act_role_dict[act] = list(roles[idx][1].keys())
-
-
 
 traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name, activity_name=activity_name,
                                      thrs=0)
@@ -87,30 +86,38 @@ for case_id in tqdm.tqdm(cases_list):
         next_activities, actual_prediction = next_act.next_act_kpis(trace, traces_hash, model, pred_column, case_id_name,
                                                                     activity_name,
                                                                     quantitative_vars, qualitative_vars, encoding='aggr-hist')
-
-        delta_KPI[str(case_id)] = [actual_prediction - np.min(next_activities['kpi_rel']),
-                                   next_activities[next_activities['kpi_rel']==np.min(next_activities['kpi_rel'])]['Next_act'].values[0]]
+        import ipdb; ipdb.set_trace()
+        next_activities.sort_values(by='kpi_rel', inplace=True)
+        delta_KPI[str(case_id)] = list()
+        for line in next_activities.index:
+            delta_KPI[str(case_id)].append((actual_prediction - next_activities.iloc[line]['kpi_rel'], next_activities.iloc[line]['Next_act']))
+        # delta_KPI[str(case_id)] = [(actual_prediction - next_activities['kpi_rel'][i], next_activities['Next_act'][i]) for i in range(len(next_activities))]
     except:
         c+=1
 
-print(f'The number of missed cases is {c}') #10% of missed cases, just 234 different prediction values, maybe the predictor is too much lowered
-
+print(f'The number of missed cases is {c}, and the final time {time.time()}') #10% of missed cases, just 234 different prediction values, maybe the predictor is too much lowered
 delta_KPI = dict(sorted(delta_KPI.items(), key=lambda item: item[1][0], reverse=True))
+# delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
 Sol = list()
 df_rec['case:concept:name'] = [str(i) for i in df_rec['case:concept:name']]
 
-for trace_idx in tqdm.tqdm(delta_KPI.keys()):
+c=False
+print(f'THE INITIAL TIME IS {time.time()}')
+for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
     if available_resources_list == set():
-        print('rotto')
+        print('Resources finished')
         break
-    best_activity = delta_KPI[trace_idx][1]
-    try:
-        resources_for_act = act_role_dict[best_activity]
-    except:
-        resources_for_act = None
-        print(f'for trace {trace_idx} there\'s no resource available')
-        continue
-
+    delta_KPIa = np.array(delta_KPI[trace_idx])
+    delta_KPIa = delta_KPIa[delta_KPIa[:,1].argsort()[::-1]]
+    for act in delta_KPIa[:,1]:
+        try:
+            resources_for_act = act_role_dict[act]
+        except:
+            resources_for_act = None
+        if set(resources_for_act).intersection(available_resources_list) != set():
+            break
+        else:
+            continue
 
     pred_case = df_rec[df_rec[case_id_name]==trace_idx]
     last = pred_case.loc[max(pred_case.index)].copy()
@@ -124,7 +131,8 @@ for trace_idx in tqdm.tqdm(delta_KPI.keys()):
     partial_results = dict()
     resources_for_act = set(resources_for_act).intersection(available_resources_list)
     if resources_for_act == set():
-        print(f'there is no resource available for case {trace_idx}')
+        print(f'b2')
+        c=True
         continue
 
     for res in resources_for_act:
@@ -137,16 +145,19 @@ for trace_idx in tqdm.tqdm(delta_KPI.keys()):
         partial_results[res] = actual_prediction
 
     try:
-        best_res = dict(sorted(partial_results.items(), key=lambda item: item[1], reverse=True))
-        best_res = list(best_res.keys())[0]
+        best_res = dict(sorted(partial_results.items(), key=lambda item: item[1], reverse=False))
+        best_res, expected_KPI = list(best_res.keys())[0], list(best_res.values())[0]
         available_resources_list.remove(best_res)
     except:
         print('bah')
 
-    Sol.append((trace_idx, best_activity, best_res))
+    Sol.append((trace_idx, act, best_res, expected_KPI))
 
-
-
+pickle.dump(Sol, open('Sol.pkl', 'wb'))
+pickle.dump(delta_KPI, open('Delta_KPI.pkl', 'wb'))
+df_sol = pd.DataFrame(Sol, columns=['Case_id', 'Activity_recommended', 'Resource', 'Expected KPI'])
+df_sol.to_csv('Results_mixed_r.csv')
+print(f'THE FINAL TIME IS {time.time()}')
 
 
 
