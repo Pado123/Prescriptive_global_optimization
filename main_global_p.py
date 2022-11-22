@@ -1,13 +1,5 @@
-import argparse
-import json
-import os
-import shutil
-import warnings
 import pickle
 import time
-# REFACTOR
-from os.path import join
-
 import numpy as np
 import pandas as pd
 import tqdm
@@ -15,6 +7,7 @@ import tqdm
 # Converter
 import pm4py
 
+#My functions
 import hash_maps
 import next_act
 import utils
@@ -40,17 +33,20 @@ if 'ACTIVITY' in X_train.columns:
                    inplace=True)
 log = pm4py.convert_to_event_log(X_train)
 roles = pm4py.discover_organizational_roles(log)
-available_resources_list = set(X_train['org:resource'].unique())
+available_resources_list = set(X_train['org:resource'].unique())- set(['missing'])
 activity_list = list(X_train['concept:name'].unique())
 act_role_dict = dict()
 cases_list = list(df_rec['case:concept:name'].unique())
-for act in activity_list:
-    for idx in range(len(roles)):
-        if act in roles[idx][0]:
-            act_role_dict[act] = list(roles[idx][1].keys())
-
+# for act in activity_list:
+#     for idx in range(len(roles)):
+#         if act in roles[idx][0]:
+#             act_role_dict[act] = list(roles[idx][1].keys())
+# pickle.dump(act_role_dict, open('act_role_dict.pkl', 'wb'))
+act_role_dict = pickle.load(open('act_role_dict.pkl', 'rb'))
 traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name, activity_name=activity_name,
                                      thrs=0)
+# traces_hash = pickle.load(open('traces_hash.pkl', 'rb'))
+
 # print('Hash-map created')
 # print('Analyze variables...')
 # quantitative_vars, qualitative_trace_vars, qualitative_vars = utils.variable_type_analysis(X_train, case_id_name,
@@ -67,94 +63,100 @@ model = utils.import_predictor(experiment_name=experiment_name, pred_column=pred
 # traces_hash = pickle.load(open('gui_backup/transition_system.pkl', 'rb'))
 quantitative_vars = pickle.load(open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'rb'))
 qualitative_vars = pickle.load(open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'rb'))
-
+#
 #Associate prediction to KPI
 delta_KPI = dict()
 c=0
+
 for case_id in tqdm.tqdm(cases_list):
     trace = df_rec[df_rec[case_id_name] == case_id].reset_index(drop=True)
-    # trace = trace.iloc[:(randrange(len(trace)) - 1)]
-    trace = trace.reset_index(drop=True)
+    last = trace.loc[max(trace.index)].copy()
 
-    # take activity list
     try:
-        acts = list(df_rec[df_rec[case_id_name] == case_id].reset_index(drop=True)[activity_name])
-
-        # Remove the last (it has been added because of the evaluation)
-        trace = trace.iloc[:-1].reset_index(drop=True)
-
-        next_activities, actual_prediction = next_act.next_act_kpis(trace, traces_hash, model, pred_column, case_id_name,
+        next_activities, actual_prediction = next_act.next_act_kpis(trace, traces_hash, model, pred_column,
+                                                                    case_id_name,
                                                                     activity_name,
-                                                                    quantitative_vars, qualitative_vars, encoding='aggr-hist')
-        import ipdb; ipdb.set_trace()
+                                                                    quantitative_vars, qualitative_vars,
+                                                                    encoding='aggr-hist')
         next_activities.sort_values(by='kpi_rel', inplace=True)
+        next_activities.reset_index(drop=True, inplace=True)
         delta_KPI[str(case_id)] = list()
         for line in next_activities.index:
             delta_KPI[str(case_id)].append((actual_prediction - next_activities.iloc[line]['kpi_rel'], next_activities.iloc[line]['Next_act']))
-        # delta_KPI[str(case_id)] = [(actual_prediction - next_activities['kpi_rel'][i], next_activities['Next_act'][i]) for i in range(len(next_activities))]
     except:
         c+=1
 
 print(f'The number of missed cases is {c}, and the final time {time.time()}') #10% of missed cases, just 234 different prediction values, maybe the predictor is too much lowered
-delta_KPI = dict(sorted(delta_KPI.items(), key=lambda item: item[1][0], reverse=True))
+delta_KPI = dict(sorted(delta_KPI.items(), key=lambda item: item[1][0][0], reverse=True))
+keys_order = {k:v[0][0] for k,v in delta_KPI.items()}
+keys_order = dict(sorted(keys_order.items(), key=lambda x: x[1], reverse=True))
+delta_KPI = {k:delta_KPI[k] for k in keys_order}
 # delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
 Sol = list()
 df_rec['case:concept:name'] = [str(i) for i in df_rec['case:concept:name']]
 
-c=False
+#Time counter for loop
 print(f'THE INITIAL TIME IS {time.time()}')
 for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
+
+    appended = False #variable inserted for understanding if exit from one of two loops
     if available_resources_list == set():
         print('Resources finished')
         break
+
+    #Select the best activity for the case
     delta_KPIa = np.array(delta_KPI[trace_idx])
-    delta_KPIa = delta_KPIa[delta_KPIa[:,1].argsort()[::-1]]
-    for act in delta_KPIa[:,1]:
-        try:
-            resources_for_act = act_role_dict[act]
-        except:
-            resources_for_act = None
-        if set(resources_for_act).intersection(available_resources_list) != set():
-            break
-        else:
+    for i in range(len(delta_KPIa)):
+
+        if appended == True:
             continue
 
-    pred_case = df_rec[df_rec[case_id_name]==trace_idx]
-    last = pred_case.loc[max(pred_case.index)].copy()
-    last_act = last[activity_name]
+        act_recommended = delta_KPIa[i][1]
+        try:
+            resources_for_act = act_role_dict[act_recommended]
+        except:
+            resources_for_act = None
+        if set(resources_for_act).intersection(available_resources_list) == set():
+            # print(f'No resource currently available for case {trace_idx}')
+            continue
 
-    # put in all the columns which are not inferrable a null value
-    for var in last.index:
-        if var in (set(quantitative_vars).union(qualitative_vars)):
-            last[var] = "none"
+        #Select the case and include the current act as traces' act
+        pred_case = df_rec[df_rec[case_id_name]==trace_idx]
+        last = pred_case.loc[max(pred_case.index)].copy()
+        last[activity_name] = act_recommended
 
-    partial_results = dict()
-    resources_for_act = set(resources_for_act).intersection(available_resources_list)
-    if resources_for_act == set():
-        print(f'b2')
-        c=True
-        continue
+        # put in all the columns which are not inferrable a null value
+        for var in last.index:
+            if var in (set(quantitative_vars).union(qualitative_vars)):
+                last[var] = "none"
 
-    for res in resources_for_act:
-        last['org:resource'] = res
-        # Create a vector with the actual prediction
-        if pred_column == 'remaining_time':
-            actual_prediction = model.predict(list(last[1:]))
-        elif pred_column == 'independent_activity':
-            actual_prediction = model.predict_proba(list(last[1:]))[0]  # activity case
-        partial_results[res] = actual_prediction
+        partial_results = dict()
+        resources_for_act = set(resources_for_act).intersection(available_resources_list)
+        if resources_for_act == set():
+            print(f'b2')
+            continue
 
-    try:
-        best_res = dict(sorted(partial_results.items(), key=lambda item: item[1], reverse=False))
-        best_res, expected_KPI = list(best_res.keys())[0], list(best_res.values())[0]
+        for res in resources_for_act:
+            last['org:resource'] = res
+            # Create a vector with the actual prediction
+            if pred_column == 'remaining_time':
+                actual_prediction = model.predict(list(last[1:]))
+            elif pred_column == 'independent_activity':
+                actual_prediction = model.predict_proba(list(last[1:]))[0]  # activity case
+            partial_results[res] = actual_prediction
+
+        partial_results = dict(sorted(partial_results.items(), key=lambda item: item[1], reverse=False))
+        best_res, expected_KPI  = list(partial_results.keys())[0], list(partial_results.values())[0]
+        Sol.append((trace_idx, act_recommended, best_res, expected_KPI))
         available_resources_list.remove(best_res)
-    except:
-        print('bah')
+        appended = True
+        print(f'Got sol for case {trace_idx}')
 
-    Sol.append((trace_idx, act, best_res, expected_KPI))
+        continue
+    continue
 
 pickle.dump(Sol, open('Sol.pkl', 'wb'))
-pickle.dump(delta_KPI, open('Delta_KPI.pkl', 'wb'))
+pickle.dump(delta_KPI, open('delta_kpi.pkl', 'wb'))
 df_sol = pd.DataFrame(Sol, columns=['Case_id', 'Activity_recommended', 'Resource', 'Expected KPI'])
 df_sol.to_csv('Results_mixed_r.csv')
 print(f'THE FINAL TIME IS {time.time()}')
