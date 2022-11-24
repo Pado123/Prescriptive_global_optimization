@@ -164,6 +164,7 @@ def generate_n_solutions_with_filtering_best_k(df_sol, n, k, delta_KPI):
 def generate_solutions_tree(df_sol, height, length, generations_number, delta_KPI):
 
     solution_tree = dict()
+    solution_tree['0'] = df_sol
     h_ = 0
     if generations_number < length:
         raise ValueError('Solutions to filter are more than solutions to generate')
@@ -186,12 +187,12 @@ def generate_solutions_tree(df_sol, height, length, generations_number, delta_KP
                 partial_solutions = {str(df_key) + '_' + str(i): partial_solutions[k] for k,i in zip(partial_solutions.keys(),range(len(partial_solutions.keys())))}
                 for key in partial_solutions.keys():
                     solution_tree[key] = partial_solutions[key]
-                pickle.dump(partial_solutions, open('ps.pkl', 'wb'))
-    solution_tree['0'] = df_sol
+                pickle.dump(solution_tree, open('ps.pkl', 'wb'))
+
     return solution_tree
 
 solution_tree = generate_solutions_tree(df_sol, height=9, length=3, generations_number=5, delta_KPI=delta_KPI)
-pickle.dump(partial_solutions, open('ps.pkl', 'wb'))
+pickle.dump(solution_tree, open('ps.pkl', 'wb'))
 print('cose')
 
 
