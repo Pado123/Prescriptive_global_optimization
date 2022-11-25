@@ -59,11 +59,14 @@ traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name,
 
 
 model = utils.import_predictor(experiment_name=experiment_name, pred_column=pred_column)
-
 # traces_hash = pickle.load(open('gui_backup/transition_system.pkl', 'rb'))
 quantitative_vars = pickle.load(open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'rb'))
 qualitative_vars = pickle.load(open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'rb'))
-#
+
+#Filter the resources for keeping just the active resources, IT ALSO REMOVES MISSING
+available_resources_list = utils.filter_resources_availability(available_resources_list, p=.75)
+if 'missing' in available_resources_list: available_resources_list.remove('missing')
+
 #Associate prediction to KPI
 delta_KPI = dict()
 c=0

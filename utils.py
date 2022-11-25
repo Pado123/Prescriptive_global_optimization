@@ -340,3 +340,29 @@ def read_data(filename, start_time_col, date_format="%Y-%m-%d %H:%M:%S"):
     return df
 
 
+def filter_resources_availability(available_resources_list, p=.75):
+
+    #Generate a 0,1 bernoulli vector
+    filter = scipy.stats.bernoulli.rvs(p, size=len(available_resources_list)).astype(bool)
+
+    #Return the filtered set
+    return set(np.array([*available_resources_list, ])[filter])
+
+def filter_and_reorder_solutions_dict(solutions_tree):
+
+    #Remove the sets (=solutions) which lead to have the same KPI (and so, thery are equal with high probability)
+    order_a = {k: solutions_tree[k][1] for k in solutions_tree.keys()}
+    already_added = set()
+    keys_sol = set()
+    for key, value in order_a.items():
+        if value not in already_added:
+            keys_sol.add(key)
+            already_added.add(value)
+    solutions_tree = {k:solutions_tree[k] for k in keys_sol}
+
+    #Get the dictionary of keys and associated KPIsum, and
+    order_a = {k:solutions_tree[k][1] for k in solutions_tree.keys()}
+    order_a = {k: v for k, v in sorted(order_a.items(), key=lambda item: item[1])}.keys()
+    solutions_tree = {k:solutions_tree[k] for k in order_a}
+
+    return solutions_tree

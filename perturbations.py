@@ -58,7 +58,6 @@ def generate_permutation(df_sol, idx_resource, delta_KPI): #How to get a permuta
     trace = df_rec[df_rec[case_id_name] == case_id].reset_index(drop=True)
     last = trace.loc[max(trace.index)].copy()
     resources_for_act = act_role_dict[case['Activity_recommended']]
-    if 'missing' in resources_for_act: resources_for_act.remove('missing')
 
     # put in all the columns which are not inferrable a null value
     for var in last.index:
@@ -147,7 +146,6 @@ def generate_permutation(df_sol, idx_resource, delta_KPI): #How to get a permuta
 
     return df_sol2
 
-
 def generate_n_solutions_with_filtering_best_k(df_sol, n, k, delta_KPI):
 
     # n = number of generated solution
@@ -163,36 +161,37 @@ def generate_n_solutions_with_filtering_best_k(df_sol, n, k, delta_KPI):
 
 def generate_solutions_tree(df_sol, height, length, generations_number, delta_KPI):
 
-    solution_tree = dict()
-    solution_tree['0'] = df_sol
+    solutions_tree = dict()
+    solutions_tree['0'] = [df_sol,  np.sum(df_sol['Expected KPI'])]
     h_ = 0
     if generations_number < length:
         raise ValueError('Solutions to filter are more than solutions to generate')
 
     while h_ <= height:
-        print(f'Processing the level {h_} and the generated solutions are {len(solution_tree)}')
-        if solution_tree == dict():
+        print(f'Processing the level {h_} and the generated solutions are {len(solutions_tree)}')
+        if solutions_tree == dict():
             # If it is empty, fill the first line
             partial_solutions = generate_n_solutions_with_filtering_best_k(df_sol, n=generations_number, k=length, delta_KPI=delta_KPI)
             partial_solutions = {str(h_) + '_' + str(i): partial_solutions[k] for k,i in zip(partial_solutions.keys(),range(len(partial_solutions.keys())))}
-            solution_tree = partial_solutions
+            solutions_tree = partial_solutions
 
         else:
             #Read the datasets to analyze
             h_ += 1
-            key_solutions_to_analyze = [key for key in solution_tree.keys() if key.count('_') == h_]
+            key_solutions_to_analyze = [key for key in solutions_tree.keys() if key.count('_') == h_]
             for df_key in key_solutions_to_analyze:
-                df = solution_tree[df_key][0]
+                df = solutions_tree[df_key][0]
                 partial_solutions = generate_n_solutions_with_filtering_best_k(df, n=generations_number, k=length, delta_KPI=delta_KPI)
                 partial_solutions = {str(df_key) + '_' + str(i): partial_solutions[k] for k,i in zip(partial_solutions.keys(),range(len(partial_solutions.keys())))}
                 for key in partial_solutions.keys():
-                    solution_tree[key] = partial_solutions[key]
-                pickle.dump(solution_tree, open('ps.pkl', 'wb'))
+                    solutions_tree[key] = partial_solutions[key]
+                pickle.dump(solutions_tree, open('solutions_tree.pkl', 'wb'))
 
-    return solution_tree
+    return solutions_tree
 
-solution_tree = generate_solutions_tree(df_sol, height=9, length=3, generations_number=5, delta_KPI=delta_KPI)
-pickle.dump(solution_tree, open('ps.pkl', 'wb'))
+solutions_tree = generate_solutions_tree(df_sol, height=9, length=3, generations_number=5, delta_KPI=delta_KPI)
+solutions_tree = utils.filter_and_reorder_solutions_dict(solutions_tree)
+pickle.dump(solutions_tree, open('solutions_tree.pkl', 'wb'))
 print('cose')
 
 
