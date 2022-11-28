@@ -3,6 +3,8 @@ import time
 import numpy as np
 import pandas as pd
 import tqdm
+import random
+random.seed(1618)
 
 # Converter
 import pm4py
@@ -13,8 +15,6 @@ import next_act
 import utils
 from IO import read, folders, create_folders
 from load_dataset import prepare_dataset
-print(f'THE INITIAL TIME IS {time.time()}')
-
 experiment_name = 'experiment_files'
 case_id_name = 'REQUEST_ID'
 
@@ -33,7 +33,7 @@ if 'ACTIVITY' in X_train.columns:
                    inplace=True)
 log = pm4py.convert_to_event_log(X_train)
 roles = pm4py.discover_organizational_roles(log)
-available_resources_list = set(X_train['org:resource'].unique())- set(['missing'])
+available_resources_list = list(pm4py.get_event_attribute_values(log, "org:resource").keys())
 activity_list = list(X_train['concept:name'].unique())
 act_role_dict = dict()
 cases_list = list(df_rec['case:concept:name'].unique())
@@ -59,15 +59,18 @@ traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name,
 
 
 model = utils.import_predictor(experiment_name=experiment_name, pred_column=pred_column)
-
 # traces_hash = pickle.load(open('gui_backup/transition_system.pkl', 'rb'))
 quantitative_vars = pickle.load(open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'rb'))
 qualitative_vars = pickle.load(open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'rb'))
-#
+
+#Filter the resources for keeping just the active resources, IT ALSO REMOVES MISSING
+available_resources_list = utils.filter_resources_availability(available_resources_list, p=.75)
+if 'missing' in available_resources_list: available_resources_list.remove('missing')
+
 #Associate prediction to KPI
 delta_KPI = dict()
 c=0
-
+print('Starting generating Delta_Kpi')
 for case_id in tqdm.tqdm(cases_list):
     trace = df_rec[df_rec[case_id_name] == case_id].reset_index(drop=True)
     last = trace.loc[max(trace.index)].copy()
@@ -85,18 +88,19 @@ for case_id in tqdm.tqdm(cases_list):
             delta_KPI[str(case_id)].append((actual_prediction - next_activities.iloc[line]['kpi_rel'], next_activities.iloc[line]['Next_act']))
     except:
         c+=1
-
 print(f'The number of missed cases is {c}, and the final time {time.time()}') #10% of missed cases, just 234 different prediction values, maybe the predictor is too much lowered
 delta_KPI = dict(sorted(delta_KPI.items(), key=lambda item: item[1][0][0], reverse=True))
 keys_order = {k:v[0][0] for k,v in delta_KPI.items()}
 keys_order = dict(sorted(keys_order.items(), key=lambda x: x[1], reverse=True))
 delta_KPI = {k:delta_KPI[k] for k in keys_order}
 # delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
+
 Sol = list()
 df_rec['case:concept:name'] = [str(i) for i in df_rec['case:concept:name']]
 
 #Time counter for loop
-print(f'THE INITIAL TIME IS {time.time()}')
+delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
+print('Starting generating the first solution')
 for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
 
     appended = False #variable inserted for understanding if exit from one of two loops
