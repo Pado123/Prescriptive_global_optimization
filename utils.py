@@ -366,3 +366,20 @@ def filter_and_reorder_solutions_dict(solutions_tree):
     solutions_tree = {k:solutions_tree[k] for k in order_a}
 
     return solutions_tree
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
