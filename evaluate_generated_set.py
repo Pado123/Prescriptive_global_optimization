@@ -32,6 +32,17 @@ solutions_tree = pickle.load(open('solutions_tree.pkl', 'rb'))
 # resources_cases_dict = generate_case_resource_dict(solutions_tree)
 resources_cases_dict = pickle.load(open('resources_cases_dict.pkl', 'rb'))
 
+def evaluate_resource_case_variability():
+    for res in solutions_tree[list(solutions_tree.keys())[0]][0]['Resource']:
+        a = set()
+        for key in solutions_tree.keys():
+            try :
+                df = solutions_tree[key][0]
+                a.add(df[df['Resource'] == res]['Case_id'].values[0])
+            except : None
+        print(f'for the res {res} there are {len(a)} cases')
+
+
 def generate_evaluation_dict(X_train, y_train, act_role_dict, pred_column='remaining_time'):
 
     log = pm4py.convert_to_event_log(X_train)
@@ -88,7 +99,6 @@ def generate_case_resource_dict(solutions_tree): #6 MIN
 
     return resources_cases_dict
 
-
 def evaluate_set(solutions_tree, act_role_dict_eval, customized=True):
 
     # Get the resources of the tree and rename the keys for convenience
@@ -104,7 +114,6 @@ def evaluate_set(solutions_tree, act_role_dict_eval, customized=True):
 
     # Generate an id-resource dictionary for the pointwise situation
     cases_resources_dict = generate_case_resource_dict(solutions_tree)
-
 
 
 
@@ -143,7 +152,6 @@ def evaluate_set(solutions_tree, act_role_dict_eval, customized=True):
 
 a = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=True)
 # b = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=False)
-
 
 if __name__ == '__main__':
     b = 'not implemented'

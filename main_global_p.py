@@ -15,6 +15,7 @@ import next_act
 import utils
 from IO import read, folders, create_folders
 from load_dataset import prepare_dataset
+
 experiment_name = 'experiment_files'
 case_id_name = 'REQUEST_ID'
 
@@ -101,6 +102,7 @@ df_rec['case:concept:name'] = [str(i) for i in df_rec['case:concept:name']]
 #Time counter for loop
 delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
 print('Starting generating the first solution')
+
 for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
 
     appended = False #variable inserted for understanding if exit from one of two loops
@@ -164,7 +166,6 @@ pickle.dump(delta_KPI, open('delta_kpi.pkl', 'wb'))
 df_sol = pd.DataFrame(Sol, columns=['Case_id', 'Activity_recommended', 'Resource', 'Expected KPI'])
 df_sol.to_csv('Results_mixed_r.csv')
 print(f'THE FINAL TIME IS {time.time()}')
-
 
 
 if __name__ == '__main__':
