@@ -43,7 +43,7 @@ df_rec[case_id_name] = df_rec[case_id_name].astype(str)
 delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
 possible_permutations = dict()
 initial_order = list(delta_KPI.keys())
-
+np.random.seed(1618)
 
 def generate_permutation(df_sol, idx_resource, delta_KPI):  # How to get a permutation from a solution, given the index
 
@@ -135,7 +135,7 @@ def generate_permutation(df_sol, idx_resource, delta_KPI):  # How to get a permu
         df_sol2 = pd.concat([line, df_sol2]).reset_index(drop=True)
     else:
         for case_ in upper_cases:
-            if case_ not in df_sol2:
+            if case_ not in df_sol2['Case_id'].values:
                 continue
             else:
                 index_of_case = df_sol2[df_sol2['Case_id'] == case_].index[0]
@@ -144,7 +144,7 @@ def generate_permutation(df_sol, idx_resource, delta_KPI):  # How to get a permu
                 df_sol2 = pd.concat([df_sol2.iloc[:index_of_case], line, df_sol2.iloc[index_of_case:]]).reset_index(
                     drop=True)
                 break
-
+    print(f'The len is {len(df_sol2)}')
     return df_sol2
 
 
@@ -191,11 +191,13 @@ def generate_solutions_tree(df_sol, height, length, generations_number, delta_KP
                                      zip(partial_solutions.keys(), range(len(partial_solutions.keys())))}
                 for key in partial_solutions.keys():
                     solutions_tree[key] = partial_solutions[key]
-                pickle.dump(solutions_tree, open('solutions_tree.pkl', 'wb'))
+                with open('solutions_tree.pkl', 'wb') as f:
+                    pickle.dump(solutions_tree, f)
+                    f.close()
 
     return solutions_tree
 
-solutions_tree = generate_solutions_tree(df_sol, height=11, length=3, generations_number=5, delta_KPI=delta_KPI)
+solutions_tree = generate_solutions_tree(df_sol, height=8, length=3, generations_number=5, delta_KPI=delta_KPI)
 print('the solutions are ', len(solutions_tree))
 solutions_tree = utils.filter_and_reorder_solutions_dict(solutions_tree)
 print('and now ', len(solutions_tree))

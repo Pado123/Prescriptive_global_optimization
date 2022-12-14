@@ -5,7 +5,6 @@ Created on Tue Nov 30 15:37:20 2021
 @author: padel
 """
 
-# %%
 import numpy as np
 import os
 import pickle
@@ -348,26 +347,47 @@ def filter_resources_availability(available_resources_list, p=.75):
     #Return the filtered set
     return set(np.array([*available_resources_list, ])[filter])
 
-def filter_and_reorder_solutions_dict(solutions_tree):
 
-    #Remove the sets (=solutions) which lead to have the same KPI (and so, thery are equal with high probability)
-    order_a = {k: solutions_tree[k][1] for k in solutions_tree.keys()}
-    already_added = set()
-    keys_sol = set()
-    for key, value in order_a.items():
-        if value not in already_added:
-            keys_sol.add(key)
-            already_added.add(value)
-    solutions_tree = {k:solutions_tree[k] for k in keys_sol}
+def generate_hashing_value(df):
+    return df['Resource'].values.sum() + df['Case_id'].values.sum()
 
-    #Get the dictionary of keys and associated KPIsum, and
-    order_a = {k:solutions_tree[k][1] for k in solutions_tree.keys()}
+
+def filter_and_reorder_solutions_dict(solutions_tree, wise = False):
+
+    if wise == False:
+        #Remove the sets (=solutions) which lead to have the same KPI (and so, thery are equal with high probability)
+        try :
+            order_a = {k: solutions_tree[k][1] for k in solutions_tree.keys()}
+        except :
+            for key in solutions_tree.keys():
+                if not type(solutions_tree[key]) == list:
+                        solutions_tree[key] = [solutions_tree[key], solutions_tree[key]['Expected KPI'].sum()]
+            order_a = {k: solutions_tree[k][1] for k in solutions_tree.keys()}
+        already_added = set()
+        keys_sol = set()
+        for key, value in order_a.items():
+            if value not in already_added:
+                keys_sol.add(key)
+                already_added.add(value)
+        solutions_tree = {k:solutions_tree[k] for k in keys_sol}
+
+    else:
+        #Create a dict in which there are keys of dict and hashes
+        done = set()
+        sol_tree = dict()
+        for key, value in solutions_tree.items():
+            hash = generate_hashing_value(solutions_tree[key][0])
+            if hash not in done:
+                sol_tree[key] = value
+                done.add(hash)
+    print('Partial len is {len(sol_tree)}')
+
+    #Order the dictionary
+    order_a = {k:sol_tree[k][1] for k in sol_tree.keys()}
     order_a = {k: v for k, v in sorted(order_a.items(), key=lambda item: item[1])}.keys()
-    solutions_tree = {k:solutions_tree[k] for k in order_a}
+    sol_tree = {k:sol_tree[k] for k in order_a}
 
-    return solutions_tree
-
-
+    return sol_tree
 
 
 

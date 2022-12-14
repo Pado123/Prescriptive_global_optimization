@@ -3,6 +3,8 @@ import pandas as pd
 import pm4py
 import numpy as np
 import random
+import os
+import glob
 
 import time
 import tqdm
@@ -24,15 +26,17 @@ if 'ACTIVITY' in X_train.columns:
     X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'}, inplace=True)
 log = pm4py.convert_to_event_log(X_train)
 act_role_dict = pickle.load(open('act_role_dict.pkl', 'rb'))
-# act_role_dict_eval = generate_evaluation_dict(X_train, y_train, act_role_dict)
-act_role_dict_eval = pickle.load( open('act_role_dict_eval.pkl', 'rb'))
+
 delta_kpi = pickle.load(open('delta_kpi.pkl', 'rb'))
 # evaluation_dict = pickle.load(open('evaluation_dict.pkl', 'rb'))
 solutions_tree = pickle.load(open('solutions_tree.pkl', 'rb'))
 # resources_cases_dict = generate_case_resource_dict(solutions_tree)
 resources_cases_dict = pickle.load(open('resources_cases_dict.pkl', 'rb'))
 
-def evaluate_resource_case_variability():
+# act_role_dict_eval = generate_evaluation_dict(X_train, y_train, act_role_dict)
+act_role_dict_eval = pickle.load(open('act_role_dict_eval.pkl', 'rb'))
+
+def evaluate_resource_case_variability(solutions_tree):
     for res in solutions_tree[list(solutions_tree.keys())[0]][0]['Resource']:
         a = set()
         for key in solutions_tree.keys():
@@ -41,7 +45,6 @@ def evaluate_resource_case_variability():
                 a.add(df[df['Resource'] == res]['Case_id'].values[0])
             except : None
         print(f'for the res {res} there are {len(a)} cases')
-
 
 def generate_evaluation_dict(X_train, y_train, act_role_dict, pred_column='remaining_time'):
 
@@ -86,7 +89,6 @@ def generate_case_resource_dict(solutions_tree): #6 MIN
                     if case not in resources_cases_dict[res].keys():
                         resources_cases_dict[res][case] = [score]
                 except :
-                    import ipdb; ipdb.set_trace()
                     c+=1
                     print('evabb', c)
 
@@ -99,7 +101,7 @@ def generate_case_resource_dict(solutions_tree): #6 MIN
 
     return resources_cases_dict
 
-def evaluate_set(solutions_tree, act_role_dict_eval, customized=True):
+def evaluate_set(solutions_tree, act_role_dict_eval, customized=True): #TODO: this function has to be completed
 
     # Get the resources of the tree and rename the keys for convenience
     res_list = set(solutions_tree[list(solutions_tree.keys())[0]][0]['Resource'].unique())
@@ -150,11 +152,56 @@ def evaluate_set(solutions_tree, act_role_dict_eval, customized=True):
         return cumulative_avg_kpi
 
 
-a = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=True)
+def merge_sol(sol1, sol2):
+
+    #Rename the keys of the dictionary for having just an order
+    r1, r2 = range(len(sol1)), range(len(sol1), len(sol1) + len(sol2))
+    sol1 = {i: sol1[k] for i,k in zip(r1, sol1.keys())}
+    sol2 = {i: sol2[k] for i,k in zip(r2, sol2.keys())}
+
+    #Merge and filter dictionaries
+    sol1 = sol1 | sol2
+    print(f'The len of dictionaries was {len(sol1)} and {len(sol2)}')
+    sol1 = utils.filter_and_reorder_solutions_dict(sol1)
+    print(f'After the merging procedure is {len(sol1)}, {r2[-1] - len(sol1)} solutions have been removed')
+    return sol1
+
+
+def cut_dict(diz, n=200):
+    return {k:diz[k] for k in list(diz.keys())}
+
+def merge_sol_all():
+
+    #Set the directory in which there are the solutions
+    if os.getcwd()[-5:]!='trees':
+        os.chdir('trees')
+
+    names = glob.glob('*')
+    final_sol = dict()
+    s1, s2 = pickle.load(open(names[0], 'rb')), pickle.load(open(names[1], 'rb'))
+    final_sol = merge_sol(s1, s2)
+
+    for name in glob.glob('*'):
+        print(name)
+        try:
+            partial_solution = pickle.load(open(name, 'rb'))
+        except :
+            print(f'db {name}')
+        final_sol = merge_sol(final_sol, partial_solution)
+
+    if os.getcwd()[-5:]=='trees':
+        os.chdir('..')
+
+    return final_sol
+
+a = merge_sol_all()
+pickle.dump(a, open('glob_sol_2.pkl', 'wb'))
+# a = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=True)
 # b = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=False)
 
 if __name__ == '__main__':
     b = 'not implemented'
+    print(f'We have generated {len(a)} different solutions')
     print(f'Code executed the cumulative avg time is {a} against the time without our ranking is {b}')
 
 
