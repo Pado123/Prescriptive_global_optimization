@@ -154,7 +154,7 @@ def generate_n_solutions_with_filtering_best_k(df_sol, n, k, delta_KPI):
     # k = the best ones I keep
     solutions = dict()
     for l in range(n):
-        index_to_replace = np.random.geometric(p=0.10, size=1)[0] #random.randint(0, 35)
+        index_to_replace = np.random.geometric(p=0.06, size=1)[0] #random.randint(0, 35)
         d = generate_permutation(df_sol=df_sol, idx_resource=index_to_replace, delta_KPI=delta_KPI)
         solutions[str(l)] = [d, np.sum(d['Expected KPI'])]
     solutions = {k: v for k, v in sorted(solutions.items(), key=lambda item: item[1][1])}

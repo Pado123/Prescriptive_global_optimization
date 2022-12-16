@@ -18,23 +18,25 @@ random.seed(1618)
 
 experiment_name = 'experiment_files'
 case_id_name = 'REQUEST_ID'
-X_train, X_test, y_train, y_test = utils.import_vars(experiment_name=experiment_name, case_id_name=case_id_name)
+# X_train, X_test, y_train, y_test = utils.import_vars(experiment_name=experiment_name, case_id_name=case_id_name)
 
 case_id_name = 'case:concept:name'
 pred_column = 'remaining_time'
-if 'ACTIVITY' in X_train.columns:
-    X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'}, inplace=True)
-log = pm4py.convert_to_event_log(X_train)
+# if 'ACTIVITY' in X_train.columns:
+#     X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'}, inplace=True)
+# log = pm4py.convert_to_event_log(X_train)
 act_role_dict = pickle.load(open('act_role_dict.pkl', 'rb'))
 
-delta_kpi = pickle.load(open('delta_kpi.pkl', 'rb'))
+# delta_kpi = pickle.load(open('delta_kpi.pkl', 'rb'))
 # evaluation_dict = pickle.load(open('evaluation_dict.pkl', 'rb'))
-solutions_tree = pickle.load(open('solutions_tree.pkl', 'rb'))
+solutions_tree = pickle.load(open('trees/solutions_global_p.pkl', 'rb'))
+solutions_tree = {k:solutions_tree[k] for k in list(solutions_tree.keys())[:500]}
 # resources_cases_dict = generate_case_resource_dict(solutions_tree)
-resources_cases_dict = pickle.load(open('resources_cases_dict.pkl', 'rb'))
+# resources_cases_dict = pickle.load(open('resources_cases_dict.pkl', 'rb'))
 
 # act_role_dict_eval = generate_evaluation_dict(X_train, y_train, act_role_dict)
 act_role_dict_eval = pickle.load(open('act_role_dict_eval.pkl', 'rb'))
+# del log, X_test, X_train, y_train, y_test, delta_kpi
 
 def evaluate_resource_case_variability(solutions_tree):
     for res in solutions_tree[list(solutions_tree.keys())[0]][0]['Resource']:
@@ -66,7 +68,7 @@ def generate_evaluation_dict(X_train, y_train, act_role_dict, pred_column='remai
     return act_role_dict_eval
 
 def generate_choice_customized_prob(weights=[.45, .165, .115, .06, 0.045, .065, .025, .03, .015, .03, .02, .02]):
-    return random.choices(range(0,12), weights)
+    return random.choices(range(0,12), weights=weights)[0]
 
 def generate_case_resource_dict(solutions_tree): #6 MIN
 
@@ -101,7 +103,9 @@ def generate_case_resource_dict(solutions_tree): #6 MIN
 
     return resources_cases_dict
 
-def evaluate_set(solutions_tree, act_role_dict_eval, customized=True): #TODO: this function has to be completed
+def evaluate_set(solutions_tree, act_role_dict_eval, customized=True, pad_mode=True): #TODO: this function has to be completed
+
+    #TODO: act_role_dict_eval to be checked
 
     # Get the resources of the tree and rename the keys for convenience
     res_list = set(solutions_tree[list(solutions_tree.keys())[0]][0]['Resource'].unique())
@@ -109,15 +113,16 @@ def evaluate_set(solutions_tree, act_role_dict_eval, customized=True): #TODO: th
         res_list = res_list.intersection(set(solutions_tree[key][0]['Resource'].unique()))
     res_list = list(res_list)
     new_keys = range(len(solutions_tree.keys()))
-    solutions_tree = dict(zip(new_keys, [i[0] for i in solutions_tree.values()]))
 
-    #Random shuffle the resources for their arrival order (it is done in-place)
-    random.shuffle(res_list)
+    #This has been removed for matching the function below
+    # solutions_tree = dict(zip(new_keys, [i[0] for i in solutions_tree.values()]))
 
-    # Generate an id-resource dictionary for the pointwise situation
-    cases_resources_dict = generate_case_resource_dict(solutions_tree)
+    #Random shuffle the resources for their arrival order (it is done in-place) #TODO: rimetti a posto queste cose
+    # random.shuffle(res_list)
 
-
+    # Generate an id-resource dictionary for the pointwise situation (ordered by KPI value)
+    # resources_cases_dict = generate_case_resource_dict(solutions_tree)
+    resources_cases_dict = pickle.load(open('rcd.pkl', 'rb'))
 
     #Following their arrival order, evaluate the choice of the list
     cumulative_avg_kpi = 0
@@ -125,29 +130,29 @@ def evaluate_set(solutions_tree, act_role_dict_eval, customized=True): #TODO: th
     chosen_case = None
     cases_done = set([None])
 
-    if customized == True:
+    if customized:
+        if pad_mode:
+            for arrived_res in tqdm.tqdm(res_list):
+                print(f'the resource number is ', res_list.index(arrived_res))
+                while chosen_case in cases_done:
 
-        for arrived_res in tqdm.tqdm(res_list):
-            print(f'the resource is ', res_list.index(arrived_res))
-            while chosen_case in cases_done:
+                    #Get the best-10 available cases and filter it with the already done cases
+                    possible_cases = list(resources_cases_dict[arrived_res].keys())
+                    possible_cases = [case for case in possible_cases if case not in cases_done][:10]
+                    print(len(possible_cases))
+                    num_choice = 11 # Messo alto a caso per fare entrare sicuramente in while
 
-                #Generate its choiche between the given probability (paper referenced)
-                choice_idx = generate_choice_customized_prob()[0]
+                    while num_choice >= len(possible_cases):
+                        num_choice = generate_choice_customized_prob()
 
-                #Get the best-10 available cases
-                cases_available_for_res_with_kpi = dict()
-                for case in resources_cases_dict[arrived_res].keys():
-                    if case not in cases_done:
-                        cases_available_for_res_with_kpi[case] = resources_cases_dict[arrived_res][case]
-                    if len(cases_available_for_res_with_kpi.keys()) == choice_idx:
-                        break
+                    #Choice the case
+                    chosen_case = possible_cases[num_choice]
+                    cases_done.add(chosen_case)
 
-
+                print(f'and has the case {chosen_case}')
 
 
-            print(f'the current score for case {chosen_case} and res {arrived_res} is {act_role_dict_eval[act_sol][arrived_res]}')
-            if choice_idx == 0:
-                idx_res +=1
+
 
         return cumulative_avg_kpi
 
@@ -162,7 +167,7 @@ def merge_sol(sol1, sol2):
     #Merge and filter dictionaries
     sol1 = sol1 | sol2
     print(f'The len of dictionaries was {len(sol1)} and {len(sol2)}')
-    sol1 = utils.filter_and_reorder_solutions_dict(sol1)
+    sol1 = utils.filter_and_reorder_solutions_dict(sol1, wise=True)
     print(f'After the merging procedure is {len(sol1)}, {r2[-1] - len(sol1)} solutions have been removed')
     return sol1
 
@@ -194,8 +199,7 @@ def merge_sol_all():
 
     return final_sol
 
-a = merge_sol_all()
-pickle.dump(a, open('glob_sol_2.pkl', 'wb'))
+c = evaluate_set(solutions_tree, act_role_dict_eval, customized=True, pad_mode=True)
 # a = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=True)
 # b = evaluate_set(solutions_tree=solutions_tree, act_role_dict_eval=act_role_dict_eval, customized=False)
 

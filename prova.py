@@ -10,12 +10,11 @@ plt.xlabel('Number of generated solutions')
 plt.ylim(0,100)
 
 
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 sns.set_theme()
-z = np.random.geometric(p=0.11, size=100000)
+z = np.random.geometric(p=0.06, size=1000000)
 sns.histplot(z)
 plt.title('Geometric distribution of idx_repl_res')
 plt.xlim(0,80)

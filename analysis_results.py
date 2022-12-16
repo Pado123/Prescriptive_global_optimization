@@ -85,8 +85,8 @@ def get_cut_test_set(t=float):
         if (line[1] < t) and (line[2] > t):
             X_test_idxs.append(line[0])
 
-def create_new_test_set(t): #TODO adjust this functions they suck
-    
+def create_new_test_set(t):
+
     final_testset = pd.DataFrame(columns=X_test.columns)
     res_list = list()
     ex = 0
@@ -116,8 +116,6 @@ def create_new_test_set(t): #TODO adjust this functions they suck
 # pickle.dump(final_testset, open('vars/test_set_split_temporarly.pkl','wb'))
 # pickle.dump(df_testset, open('vars/test_set_split_temporarly_with_y.pkl','wb'))
 
-#%% put y in final test_set
-#TODO: aggiusta codice
 def fill_y_values():
     df_testset = pickle.load(open('vars/test_set_split_temporarly.pkl','rb')).reset_index(drop=True)
     df_testset['lead_time'] = np.zeros(len(df_testset))

@@ -370,6 +370,8 @@ def filter_and_reorder_solutions_dict(solutions_tree, wise = False):
                 keys_sol.add(key)
                 already_added.add(value)
         solutions_tree = {k:solutions_tree[k] for k in keys_sol}
+        sol_tree = solutions_tree.copy()
+        del solutions_tree
 
     else:
         #Create a dict in which there are keys of dict and hashes

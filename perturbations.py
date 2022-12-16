@@ -153,13 +153,12 @@ def generate_n_solutions_with_filtering_best_k(df_sol, n, k, delta_KPI):
     # k = the best ones I keep
     solutions = dict()
     for l in range(n):
-        index_to_replace = np.random.geometric(p=0.10, size=1)[0] #random.randint(0, 35)
+        index_to_replace = np.random.geometric(p=.06, size=1)[0] #random.randint(0, 35)
         d = generate_permutation(df_sol=df_sol, idx_resource=index_to_replace, delta_KPI=delta_KPI)
         solutions[str(l)] = [d, np.sum(d['Expected KPI'])]
     solutions = {k: v for k, v in sorted(solutions.items(), key=lambda item: item[1][1])}
     solutions = {i: solutions[k] for k, i in zip(list(solutions.keys())[:k], range(k))}
     return solutions
-
 
 def generate_solutions_tree(df_sol, height, length, generations_number, delta_KPI):
     solutions_tree = dict()
@@ -197,9 +196,9 @@ def generate_solutions_tree(df_sol, height, length, generations_number, delta_KP
 
     return solutions_tree
 
-solutions_tree = generate_solutions_tree(df_sol, height=8, length=3, generations_number=5, delta_KPI=delta_KPI)
+solutions_tree = generate_solutions_tree(df_sol, height=4, length=3, generations_number=5, delta_KPI=delta_KPI)
 print('the solutions are ', len(solutions_tree))
-solutions_tree = utils.filter_and_reorder_solutions_dict(solutions_tree)
+solutions_tree = utils.filter_and_reorder_solutions_dict(solutions_tree, wise=True)
 print('and now ', len(solutions_tree))
 pickle.dump(solutions_tree, open('solutions_tree.pkl', 'wb'))
 
