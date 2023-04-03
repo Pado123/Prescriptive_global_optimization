@@ -19,3 +19,5 @@ Generation of DeltaRank: main_global_p.py
 Generation of Profiles Rank: perturbations.py 
 
 Evaluation of system: evaluate_generated_set.py
+
+Datasets available in folder "data"
