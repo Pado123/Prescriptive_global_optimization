@@ -20,4 +20,4 @@ Generation of Profiles Rank: perturbations.py
 
 Evaluation of system: evaluate_generated_set.py
 
-Datasets available in folder "data"
+Datasets are bigger than 25MB, so they are both available via email. VINST is also available following the link on the paper.
