@@ -20,14 +20,9 @@ plt.style.use('ggplot')
 
 def evaluate_shap_vals(trace, model, X_test, case_id_name):
     trace = trace.iloc[-1]
-    X_test.rename(columns={'time_from_midnight': 'daytime'}, inplace=True)
-    X_test = X_test[trace.index]
-    df = X_test.append(trace).reset_index(drop=True)
-    df = df[[i for i in X_test.columns if i!=case_id_name]]
-    # df = df[[list(model.feature_names_)]]
     explainer = shap.TreeExplainer(model)
-    shap_values = explainer.shap_values(df)
-    return shap_values[-1]
+    shap_values = explainer.shap_values(trace.iloc[:1])
+    return shap_values[0]
    
 
 def plot_explanations_recs(groundtruth_explanation, explanations, idxs_chosen, last, experiment_name, trace_idx, act):

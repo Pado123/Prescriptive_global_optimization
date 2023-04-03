@@ -148,7 +148,6 @@ if filename_running is not None:
     df_running = read_data(filename_running, args.start_date_name, args.date_format)
     print(df_running.shape)
 
-
 create_folders(folders, safe=override)
 
 use_remaining_for_num_targets = None
@@ -224,9 +223,11 @@ traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name,
 print('Hash-map created')
 
 # %% Generate and test recommendations
-df_rec = utils.get_test(X_test, case_id_name).reset_index(drop=True)
+df_rec = utils.get_test(X_test, case_id_name)#.reset_index(drop=True)
 df_score = utils.create_eval_set(X_test, y_test).values
 columns = X_test.columns
 next_act.generate_recommendations(df_rec, df_score, columns, case_id_name, pred_column, activity_name,
                                   traces_hash, model, quantitative_vars, qualitative_vars, X_test,
                                   experiment_name, explain=explain, predict_activities=predict_activities)
+if __name__ == '__main__':
+    print('run')

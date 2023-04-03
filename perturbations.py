@@ -1,49 +1,68 @@
 import pickle
-import pandas as pd
-import pm4py
 import numpy as np
+import pandas as pd
 import random
+import os
+random.seed(1618)
 
-import time
-import tqdm
+# Converter
+import pm4py
+
+#My functions
 import hash_maps
 import utils
-from hash_maps import str_list, list_str
-import next_act
 
-# Preliminary imports of variables
-experiment_name = 'experiment_files'
+experiment_name = 'BACTIME'
 case_id_name = 'REQUEST_ID'
+pred_column = 'remaining_time'
+
+perturbations_folder_name = f'trees_{experiment_name}'
+if not os.path.exists(perturbations_folder_name):
+    os.mkdir(perturbations_folder_name)
+
 X_train, X_test, y_train, y_test = utils.import_vars(experiment_name=experiment_name, case_id_name=case_id_name)
 activity_name = 'concept:name'
 # df_rec = utils.get_test(X_test, case_id_name).reset_index(drop=True)
-df_rec = pickle.load(open('df_rec.pkl', 'rb'))
+try:
+    df_rec = pickle.load(open(f'df_rec_{experiment_name}.pkl', 'rb'))
+except:
+    df_rec = utils.get_test(X_test, case_id_name).reset_index(drop=True)
+    pickle.dump(df_rec, open(f'df_rec_{experiment_name}.pkl', 'wb'))
+
 columns = X_test.columns
 case_id_name = 'case:concept:name'
-pred_column = 'remaining_time'
+
 if 'ACTIVITY' in X_train.columns:
-    X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'},
-                   inplace=True)
+    X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'}, inplace=True)
     df_rec.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'},
-                  inplace=True)
+                   inplace=True)
 log = pm4py.convert_to_event_log(X_train)
-# roles = pm4py.discover_organizational_roles(log)
-# available_resources_list = utils.filter_resources_availability(set(X_train['org:resource'].unique()), p=.75)
+roles = pm4py.discover_organizational_roles(log)
+available_resources_list = list(pm4py.get_event_attribute_values(log, "org:resource").keys())
 activity_list = list(X_train['concept:name'].unique())
-act_role_dict = pickle.load(open('act_role_dict.pkl', 'rb'))
+act_role_dict = dict()
 cases_list = list(df_rec['case:concept:name'].unique())
+try:
+    act_role_dict = pickle.load(open(f'act_role_dict_{experiment_name}.pkl', 'rb'))
+except:
+    cases_list = list(df_rec['case:concept:name'].unique())
+    for act in activity_list:
+        for idx in range(len(roles)):
+            if act in roles[idx][0]:
+                act_role_dict[act] = list(roles[idx][1].keys())
+    pickle.dump(act_role_dict, open(f'act_role_dict_{experiment_name}.pkl', 'wb'))
+
 traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name, activity_name=activity_name, thrs=0)
 # traces_hash = pickle.load(open('traces_hash.pkl', 'rb'))
 model = utils.import_predictor(experiment_name=experiment_name, pred_column=pred_column)
 quantitative_vars = pickle.load(open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'rb'))
 qualitative_vars = pickle.load(open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'rb'))
-df_sol = pd.read_csv('Results_mixed_r.csv', index_col=0)
+df_sol = pd.read_csv(f'Results_mixed_r_{experiment_name}.csv', index_col=0)
 df_sol['Case_id'] = df_sol['Case_id'].astype(str)
 df_rec[case_id_name] = df_rec[case_id_name].astype(str)
-delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
+delta_KPI = pickle.load(open(f'delta_kpi_{experiment_name}.pkl', 'rb'))
 possible_permutations = dict()
 initial_order = list(delta_KPI.keys())
-np.random.seed(1618)
 
 def generate_permutation(df_sol, idx_resource, delta_KPI):  # How to get a permutation from a solution, given the index
 
@@ -98,6 +117,7 @@ def generate_permutation(df_sol, idx_resource, delta_KPI):  # How to get a permu
     df_sol2.reset_index(drop=True, inplace=True)
     updated_id = set(df_sol2['Case_id'])
     available_KPIs = {k: v for k, v in delta_KPI.items() if k not in updated_id}
+
 
     # Select the new couple activity-resource, in the KPI_first manner
     res_traces = dict()
@@ -190,17 +210,17 @@ def generate_solutions_tree(df_sol, height, length, generations_number, delta_KP
                                      zip(partial_solutions.keys(), range(len(partial_solutions.keys())))}
                 for key in partial_solutions.keys():
                     solutions_tree[key] = partial_solutions[key]
-                with open('solutions_tree.pkl', 'wb') as f:
+                with open(f'trees_{experiment_name}/solutions_tree_{experiment_name}.pkl', 'wb') as f:
                     pickle.dump(solutions_tree, f)
                     f.close()
 
     return solutions_tree
 
-solutions_tree = generate_solutions_tree(df_sol, height=4, length=3, generations_number=5, delta_KPI=delta_KPI)
+solutions_tree = generate_solutions_tree(df_sol, height=20, length=3, generations_number=5, delta_KPI=delta_KPI)
 print('the solutions are ', len(solutions_tree))
 solutions_tree = utils.filter_and_reorder_solutions_dict(solutions_tree, wise=True)
 print('and now ', len(solutions_tree))
-pickle.dump(solutions_tree, open('solutions_tree.pkl', 'wb'))
+pickle.dump(solutions_tree, open(f'trees_{experiment_name}/solutions_tree_{experiment_name}.pkl', 'wb'))
 
 if __name__ == '__main__':
     print('Code executed')

@@ -341,8 +341,6 @@ def calculate_costs(df, costs, working_times, activity_column_name, resource_col
     """
 
     # preallocate case cost column
-    import ipdb;
-    ipdb.set_trace()
     df["case_cost"] = 0
     activities = df[activity_column_name].unique()
     roles = df[role_column_name].unique()
@@ -373,8 +371,7 @@ def calculate_costs(df, costs, working_times, activity_column_name, resource_col
 
     # at this point you sum the cost for previous events of the case (is a case cost, not event cost)
     df["case_cost"] = df.groupby(case_id_name)["case_cost"].cumsum()
-    import ipdb;
-    ipdb.set_trace()
+
     return df
 
 
@@ -521,7 +518,7 @@ def prepare_dataset(df, case_id_name, activity_column_name, start_date_name, dat
         os.mkdir('indexes')
 
     if not (os.path.exists(f'indexes/test_idx_{case_id_name}.pkl') and os.path.exists(f'indexes/train_idx_{case_id_name}.pkl')):
-        get_split_indexes(df, case_id_name, start_date_name, train_size=.65)
+        get_split_indexes(df, case_id_name, start_date_name, train_size=.50)
     else:
         print('reading indexes')
 

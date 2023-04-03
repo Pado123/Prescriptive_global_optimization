@@ -4,7 +4,7 @@ import math, random
 from itertools import cycle
 from scipy import interp
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, accuracy_score, \
-    f1_score, confusion_matrix, plot_confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, mean_absolute_error
+    f1_score, confusion_matrix, roc_auc_score, ConfusionMatrixDisplay, mean_absolute_error
 import matplotlib.pyplot as plt
 
 import os

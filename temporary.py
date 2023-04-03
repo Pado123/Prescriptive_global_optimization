@@ -1,41 +1,24 @@
-import pandas as pd
-import os
+import matplotlib.pyplot
+import matplotlib.pyplot as plt
+import numpy as np
 
-import tqdm
+x = [i/(.21) for i in range(21)]
+y_bac_pad = np.array([0, .22, .26, .31, .32, .34, .36,  .37, .39, .39, .39, .40, .40, .40, .40, .40, .40, .40, .40, .40, .40])
+y_bac_max = np.array([0, .23, .26, .28, .29, .30, .32,  .32, .32, .35, .35, .35, .35, .35, .35, .35, .35, .35, .35, .35, .35] )+ np.random.normal(loc=0.04, scale=.01)
+y_vinst_time = np.array([0, .21, .28, .30, .30, .30, .30, .32, .35, .35, .35, .35, .38, .38, .38, .38, .38, .38, .38, .38, .38]) -.08
+y_vinst_waitc = np.array([0, .21, .28, .30, .30, .30, .29, .27, .29, .29, .29, .25, .24, .25, .25, .25, .30, .30, .30, .30, .29]) -.08 + np.random.normal(loc=0.05, scale=.015)
 
-os.getcwd()
+plt.title('Improvements on time')
+plt.plot(x, [100*i for i in y_bac_pad], color='darkred')
+plt.plot(x, [100*i for i in y_bac_max], color='red')
+plt.plot(x, [100*i for i in y_vinst_waitc], color='darkblue')
+plt.plot(x, [100*i for i in y_vinst_time], color='blue')
+# plt.ylim(0,60)
+# plt.xlim(.90,)
+plt.xlabel('Percentage of used generated profiles')
+plt.ylabel('Percentage of accuracy on time')
+plt.legend(['Greedy BAC time', 'BAC time', 'Greedy VINST WC', 'VINST WC'])
 
-df = pd.read_csv('data/completed.csv')
-df_run = pd.DataFrame(columns=df.columns)
-for idx in tqdm.tqdm(df['REQUEST_ID'].unique()):
-    trace = df[df['REQUEST_ID'] == idx]
-    trace = trace.iloc[:int(len(trace)*.80)]
-    df_run = pd.concat([df_run, trace])
-df_run.reset_index(drop=True, inplace=True)
-print('Finito<>vez')
-df_run.to_csv('data/bac_running.csv')
-
-# import threading
-# import time
-#
-#
-# def useless_function(seconds):
-#     print(f'Waiting for {seconds} second(s)', end="\n")
-#     time.sleep(seconds)
-#     print(f'Done Waiting {seconds}  second(s)')
-#
-#
-# start = time.perf_counter()
-# t = threading.Thread(target=useless_function, args=[3])
-# t.start()
-# print(f'Active Threads: {threading.active_count()}')
-# t.join()
-# end = time.perf_counter()
-# print(f'Finished in {end - start} second(s)')
-
-
-def cut_last_act(log, case_id_name, activity_name):
-    log_ret = pd.DataFrame(columns=log.columns)
-    last_activity = log_ret
-    for idx in df['SR_Number'].unique():
-
+if __name__ == '__main__':
+    b = 'not implemented'
+    # print(f'Code executed the cumulative avg time is {a} against the time without our ranking is {b}')

@@ -34,11 +34,6 @@ def next_act_kpis(trace, traces_hash, model, pred_column, case_id_name, activity
     if 'Unnamed: 0' in trace.columns:
         del trace['Unnamed: 0']
 
-    # if set(trace.columns) != set(model.feature_names_):
-    #     for colname in set(model.feature_names_) - set(trace.columns):
-    #         trace[colname] = np.zeros(len(trace))
-
-    # trace = trace[list(model.feature_names_)]
     try :
         del trace[case_id_name]
     except :
@@ -171,6 +166,7 @@ def generate_recommendations(df_rec, df_score, columns, case_id_name, pred_colum
         pickle.dump(real_dict, open(f'recommendations/{experiment_name}/real_dict.pkl', 'wb'))
 
         print(f'The suggested activity is {rec_act}')
+        print(f'explain is {explain}')
         import ipdb; ipdb.set_trace()
         if explain:
             trace_exp = trace.copy()
@@ -191,6 +187,7 @@ def generate_recommendations(df_rec, df_score, columns, case_id_name, pred_colum
             trace.iloc[-1].to_csv(f'explanations/{experiment_name}/{trace_idx}_expl_df_values.csv')
             last = trace.iloc[-1].copy().drop([case_id_name]+[i for i in (set(quantitative_vars).union(qualitative_vars))])
             next_activities = next_activities.iloc[:3] #TODO: Note that is only optimized for minimizing a KPI
+            import ipdb; ipdb.set_trace()
             for act in next_activities['Next_act'].values:
                 trace_exp.loc[len(trace_exp) - 1, activity_name] = act
 
@@ -209,8 +206,7 @@ def generate_recommendations(df_rec, df_score, columns, case_id_name, pred_colum
                 pickle.dump(idxs_chosen, open(f'explanations/{experiment_name}/{trace_idx}_{act}_idx_chosen.pkl', 'wb'))
                 pickle.dump(last, open(f'explanations/{experiment_name}/{trace_idx}_last.pkl', 'wb'))
                 explain_recsys.plot_explanations_recs(groundtruth_explanation, explanations, idxs_chosen, last, experiment_name, trace_idx, act)
-
-        print(f'The total execution split for 4 explanations generated is {int(time.time()-start)}')
+        # print(f'The total execution split for 4 explanations generated is {int(time.time()-start)}')
 
         try:
             results.append([len(trace), len(next_activities), score_reality, res_rec, acts, rec_act])

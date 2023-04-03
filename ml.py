@@ -240,7 +240,8 @@ def generate_train_and_test_sets(df, target_column, target_column_name, event_le
         else:
             # take cases for training in random order (the seed is fixed for replicability)
             cases = df[case_id_name].unique()
-            number_train_cases = round((third_quartile + second_quartile) / 2)
+            # number_train_cases = round((third_quartile + second_quartile) / 2)
+            number_train_cases = round(second_quartile)
             train_cases = np.random.choice(cases, size=number_train_cases, replace=False)
             # dfTrain = df[df[case_id_name].isin(train_cases)]
             dfTest = df[~df[case_id_name].isin(train_cases)]

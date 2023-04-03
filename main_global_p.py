@@ -5,7 +5,7 @@ import pandas as pd
 import tqdm
 import random
 random.seed(1618)
-
+np.random.seed(1618)
 # Converter
 import pm4py
 
@@ -16,47 +16,50 @@ import utils
 from IO import read, folders, create_folders
 from load_dataset import prepare_dataset
 
-experiment_name = 'experiment_files'
+
+
+experiment_name = 'BACTIME'
 case_id_name = 'REQUEST_ID'
+pred_column = 'remaining_time'
 
 X_train, X_test, y_train, y_test = utils.import_vars(experiment_name=experiment_name, case_id_name=case_id_name)
 activity_name = 'concept:name'
-# df_rec = utils.get_test(X_test, case_id_name).reset_index(drop=True)
-df_rec = pickle.load(open('df_rec.pkl', 'rb'))
+df_rec = utils.get_test(X_test, case_id_name).reset_index(drop=True)
+# df_rec = pickle.load(open('df_rec.pkl', 'rb'))
 
 columns = X_test.columns
 case_id_name = 'case:concept:name'
-pred_column = 'remaining_time'
 
 if 'ACTIVITY' in X_train.columns:
     X_train.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'}, inplace=True)
     df_rec.rename(columns={'REQUEST_ID': 'case:concept:name', 'ACTIVITY': 'concept:name', 'CE_UO': 'org:resource'},
                    inplace=True)
+
+
 log = pm4py.convert_to_event_log(X_train)
 roles = pm4py.discover_organizational_roles(log)
 available_resources_list = list(pm4py.get_event_attribute_values(log, "org:resource").keys())
 activity_list = list(X_train['concept:name'].unique())
 act_role_dict = dict()
 cases_list = list(df_rec['case:concept:name'].unique())
-# for act in activity_list:
-#     for idx in range(len(roles)):
-#         if act in roles[idx][0]:
-#             act_role_dict[act] = list(roles[idx][1].keys())
-# pickle.dump(act_role_dict, open('act_role_dict.pkl', 'wb'))
-act_role_dict = pickle.load(open('act_role_dict.pkl', 'rb'))
+for act in activity_list:
+    for idx in range(len(roles)):
+        if act in roles[idx][0]:
+            act_role_dict[act] = list(roles[idx][1].keys())
+
 traces_hash = hash_maps.fill_hashmap(X_train=X_train, case_id_name=case_id_name, activity_name=activity_name,
                                      thrs=0)
 # traces_hash = pickle.load(open('traces_hash.pkl', 'rb'))
 
-# print('Hash-map created')
-# print('Analyze variables...')
-# quantitative_vars, qualitative_trace_vars, qualitative_vars = utils.variable_type_analysis(X_train, case_id_name,
-#                                                                                            activity_name)
+print('Hash-map created')
+print('Analyze variables...')
+quantitative_vars, qualitative_trace_vars, qualitative_vars = utils.variable_type_analysis(X_train, case_id_name,
+                                                                                           activity_name)
 # warnings.filterwarnings("ignore")
-# print('Variable analysis done')
-# pickle.dump(quantitative_vars, open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'wb'))
-# pickle.dump(qualitative_vars, open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'wb'))
-# pickle.dump(traces_hash, open(f'explanations/{experiment_name}/traces_hash.pkl', 'wb'))
+print('Variable analysis done')
+pickle.dump(quantitative_vars, open(f'explanations/{experiment_name}/quantitative_vars.pkl', 'wb'))
+pickle.dump(qualitative_vars, open(f'explanations/{experiment_name}/qualitative_vars.pkl', 'wb'))
+pickle.dump(traces_hash, open(f'explanations/{experiment_name}/traces_hash.pkl', 'wb'))
 
 
 model = utils.import_predictor(experiment_name=experiment_name, pred_column=pred_column)
@@ -89,6 +92,7 @@ for case_id in tqdm.tqdm(cases_list):
             delta_KPI[str(case_id)].append((actual_prediction - next_activities.iloc[line]['kpi_rel'], next_activities.iloc[line]['Next_act']))
     except:
         c+=1
+
 print(f'The number of missed cases is {c}, and the final time {time.time()}') #10% of missed cases, just 234 different prediction values, maybe the predictor is too much lowered
 delta_KPI = dict(sorted(delta_KPI.items(), key=lambda item: item[1][0][0], reverse=True))
 keys_order = {k:v[0][0] for k,v in delta_KPI.items()}
@@ -100,7 +104,7 @@ Sol = list()
 df_rec['case:concept:name'] = [str(i) for i in df_rec['case:concept:name']]
 
 #Time counter for loop
-delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
+# delta_KPI = pickle.load(open('delta_kpi.pkl', 'rb'))
 print('Starting generating the first solution')
 
 for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
@@ -161,10 +165,10 @@ for trace_idx in tqdm.tqdm(list(delta_KPI.keys())):
         continue
     continue
 
-pickle.dump(Sol, open('Sol.pkl', 'wb'))
-pickle.dump(delta_KPI, open('delta_kpi.pkl', 'wb'))
+pickle.dump(Sol, open(f'Sol_{experiment_name}.pkl', 'wb'))
+pickle.dump(delta_KPI, open(f'delta_kpi_{experiment_name}.pkl', 'wb'))
 df_sol = pd.DataFrame(Sol, columns=['Case_id', 'Activity_recommended', 'Resource', 'Expected KPI'])
-df_sol.to_csv('Results_mixed_r.csv')
+df_sol.to_csv(f'Results_mixed_r_{experiment_name}.csv')
 print(f'THE FINAL TIME IS {time.time()}')
 
 

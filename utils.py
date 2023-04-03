@@ -20,17 +20,21 @@ import glob
 import itertools
 import pm4py
 import tqdm
+from collections import Counter
 
 import hash_maps
 np.random.seed(1618)
 
 
 # %% Import test and valid
-def import_vars(experiment_name=str, case_id_name=str):
+def import_vars(experiment_name=str, case_id_name=str, join_valid=False):
     info = read(folders['model']['data_info'])
     column_types = info["column_types"]
-    dfTrain = read(folders['model']['dfTrain'], dtype=column_types)
-    dfTest = read(folders['model']['dfTest'], dtype=column_types)
+    dfTrain = read('experiments/' + experiment_name + '/model/dfTrain.csv')
+    dfTest = read('experiments/' + experiment_name + '/model/dfTest.csv')
+    if join_valid:
+        dfValid = read(folders['model']['dfValid'], dtype=column_types)
+        dfTest = pd.concat([dfTest, dfValid])
     return dfTrain.iloc[:, :-1].reset_index(drop=True), dfTest.iloc[:, :-1].reset_index(drop=True), dfTrain.iloc[:,-1].reset_index(drop=True), dfTest.iloc[:, -1].reset_index(drop=True)
 
 
@@ -230,18 +234,24 @@ def get_test(X_test, case_id_name):
 
     for idx in X_test[case_id_name].unique():
         df = X_test[X_test[case_id_name] == idx]
-        cut = int(len(df) * random.uniform(0, 1)) + 2  # 2 because one for the floor and one for the pred
+        cut = int(len(df) * random.uniform(0, 1)) + 1  # 2 because one for the floor and one for the pred
         df = df.iloc[:cut].reset_index(drop=True)
         df_rec = pd.concat([df_rec, df])
 
     return df_rec.reset_index(drop=True)
 
 
-def create_eval_set(X_test, y_test):
-    X_test['y'] = y_test
-    columns = [col for col in X_test.columns if (col[0] == '#' or col == 'y')]
-    eval_df = X_test[columns]
-    return eval_df
+def create_eval_set(X_test, y_test, add_res=False):
+    if not add_res:
+        X_test['y'] = y_test
+        columns = [col for col in X_test.columns if (col[0] == '#' or col == 'y')]
+        eval_df = X_test[columns]
+        return eval_df
+    if add_res:
+        X_test['y'] = y_test
+        columns = [col for col in X_test.columns if (col[0] == '#' or col == 'y' or col == 'org:resource')]
+        eval_df = X_test[columns]
+        return eval_df
 
 
 def trace_to_encoding(trace, activity_name, columns, resize=False):
@@ -251,7 +261,7 @@ def trace_to_encoding(trace, activity_name, columns, resize=False):
 
     # Si può ottimizzare mettendo fuori come comincia una traccia
     for act in trace:
-        encoded_trace['# ' + activity_name + '=' + act] += 1
+        encoded_trace['# ' + 'ACTIVITY' + '=' + act] += 1
     if resize:
         encoded_trace = (np.array(encoded_trace) / np.sum(encoded_trace)).reshape(1, -1)
     else:
@@ -259,36 +269,41 @@ def trace_to_encoding(trace, activity_name, columns, resize=False):
 
     return encoded_trace
 
+def remove_frequence_of_activities(encoded_trace):
+    return np.array([bool(a)*1 for a in encoded_trace])
 
-def closest_centroid_traces(encoded_trace, centroids, encoding_df):
-    closeness_vals = {key: euclidean_distances(encoded_trace, value.reshape(1, -1)) for key, value in centroids.items()}
-    centroid = [key for key in closeness_vals.keys() if closeness_vals[key] == min(closeness_vals.values())][0]
-    return X_test_centroids[X_test_centroids['cluster'] == int(centroid)].iloc[:, :-1]
+def from_trace_to_score(trace, pred_column, activity_name, df_score, columns, predict_activities=None, remove_loop_consideration=False):
 
-
-def from_trace_to_score(trace, pred_column, activity_name, df_score, columns, predict_activities=None):
     encoded_trace = trace_to_encoding(trace, activity_name, columns, resize=False)
+    if remove_loop_consideration:
+        encoded_trace = remove_frequence_of_activities(encoded_trace)
     l = list()
-    # list(trace[activity_name]) + [rec_act], pred_column, activity_name, df_score, columns
+
     if pred_column == 'independent_activity':
-        index_pa = list(columns).index('# ACTIVITY='+predict_activities[0]) - sum([('#' not in i) for i in columns])
+        try:
+            index_pa = list(columns).index('# ' + activity_name + '='+predict_activities[0]) - sum([('#' not in i) for i in columns])
+        except:
+            index_pa = list(columns).index('# ' + 'ACTIVITY' + '=' + predict_activities[0]) - sum(
+                [('#' not in i) for i in columns])
         for line in df_score[:,:-1]:
             if (encoded_trace <= line).all():
                 l.append(line - encoded_trace)
         if len(l) > 0:
-            return np.mean(np.array(l), axis=0)[index_pa]
+            return np.mean(np.array(l), axis=0)[index_pa], len(l)
         else:
-            return None
+            return None, None
 
     if pred_column == 'remaining_time':
         for idx in range(len(df_score)):
-            if (encoded_trace <= df_score[idx][:-1]).all():
-                l.append(df_score[idx][-1])
-
+            try:
+                if (encoded_trace <= df_score[idx][:-1]).all():
+                    l.append(df_score[idx][-1])
+            except:
+                print('db')
         if len(l) > 0:
-            return np.mean(np.array(l))
+            return np.mean(np.array(l)), len(l)
         else:
-            return None
+            return None, None
 
 def get_train_test_indexes(path_to_complete_df=str):
     dataset = pd.read_csv(path_to_complete_df)
@@ -352,7 +367,7 @@ def generate_hashing_value(df):
     return df['Resource'].values.sum() + df['Case_id'].values.sum()
 
 
-def filter_and_reorder_solutions_dict(solutions_tree, wise = False):
+def filter_and_reorder_solutions_dict(solutions_tree, wise=False, order=False):
 
     if wise == False:
         #Remove the sets (=solutions) which lead to have the same KPI (and so, thery are equal with high probability)
@@ -382,26 +397,98 @@ def filter_and_reorder_solutions_dict(solutions_tree, wise = False):
             if hash not in done:
                 sol_tree[key] = value
                 done.add(hash)
-    print('Partial len is {len(sol_tree)}')
 
-    #Order the dictionary
-    order_a = {k:sol_tree[k][1] for k in sol_tree.keys()}
-    order_a = {k: v for k, v in sorted(order_a.items(), key=lambda item: item[1])}.keys()
-    sol_tree = {k:sol_tree[k] for k in order_a}
+    if order:
+        #Order the dictionary
+        order_a = {k:sol_tree[k][1] for k in sol_tree.keys()}
+        order_a = {k: v for k, v in sorted(order_a.items(), key=lambda item: item[1])}.keys()
+        sol_tree = {k:sol_tree[k] for k in order_a}
 
     return sol_tree
 
+def get_possible_cases_maxtype(resource, base_idx, solutions_tree, selected_solutions, cases_done, num_choice):
+
+    solutions_tree = solutions_tree[base_idx:]
+    cases_done_and_analyzed = cases_done.copy()
+    cases_list = list()
+    first_idx = None
+
+    for idx, profile in enumerate(solutions_tree):
+
+        df = profile[['Case_id', 'Resource']]
+
+        #Check if the dataset is a subdataset (the solution matches)
+        if not len(selected_solutions.merge(df).drop_duplicates()) == len(selected_solutions.drop_duplicates()):
+            continue
+        if num_choice + 1 == 1:
+            new_case = df[df['Resource'] == resource]['Case_id'].values[0]
+            cases_list.append(new_case)
+            if first_idx is None:
+                first_idx = idx + base_idx
+
+            print(f'Siamo a {first_idx} e fuori dal loop con indice {idx}')
+            return cases_list, first_idx
+
+        #Now I am sure it is a feasible profile set
+        new_case = df[df['Resource']==resource]['Case_id'].values[0]
+        if first_idx is None:
+            first_idx = idx + base_idx
+        if new_case not in cases_done_and_analyzed:
+            cases_done_and_analyzed.add(new_case)
+            cases_list.append(new_case)
+        if len(cases_list) == num_choice + 1:
+            break
+
+    print(f'Siamo a {first_idx} nel primo indice')
+    return cases_list, first_idx
 
 
+def eval_base_value(selected_solutions, df_rec, df_score, case_id_name, activity_name, pred_column, X_test, predict_activities):
+    failed = 0
+    cumulative_avg_kpi = 0
+    lenghts = []
+    res_list = list(selected_solutions['Resource'])
+    chosen = 0
+    scoring_df = df_score[[i for i in df_score.columns if i!='org:resource']].values
+    for row, line in selected_solutions.iterrows():
+        try:
+            acts = list(df_rec[df_rec[case_id_name] == int(line['Case_id'])][activity_name].values)
+        except:
+            try:
+                acts = list(df_rec[df_rec[case_id_name] == line['Case_id']][activity_name].values)
+            except:
+                failed += 1
+                continue
+        score, avg_num_of_samples = from_trace_to_score(acts, pred_column=pred_column,
+                                                              activity_name=activity_name,
+                                                              df_score=scoring_df, columns=X_test.columns,
+                                                              predict_activities=predict_activities,
+                                                              remove_loop_consideration=True)  # Not tested for predict_activities!=None
 
+        if score == None:
+            failed += 1
+            print('Score function has failed')
+        else:
+            cumulative_avg_kpi += score
+        lenghts.append(avg_num_of_samples)
 
+    return (cumulative_avg_kpi, round(chosen / len(res_list), 2), selected_solutions, failed, lenghts)
 
+def provide_freedom_value(resources_cases_dict, selected_solutions):
+    c = 0
+    selected_resources = selected_solutions['Resource'].values
+    couples = dict()
+    for i in resources_cases_dict.keys():
+        if i in selected_resources:
+            # print(len(resources_cases_dict[i]))
+            if len(resources_cases_dict[i]) == 1:
+                c += 1
+            if len(resources_cases_dict[i]) == 2:
+                couples[i] = list(resources_cases_dict[i].keys())
 
+    #Qui aggiorno il fatto che se due risorse hanno due tracce possibili, una diventa obbligata
+    c += int(np.sum(dict(Counter([tuple(i) for i in couples.values()])).values() == 2)/2)
 
-
-
-
-
-
-
+    #Returns the unavailable resources
+    return c
 
