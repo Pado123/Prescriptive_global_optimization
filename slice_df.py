@@ -1,6 +1,7 @@
 import argparse
 import pandas as pd
 import pm4py
+from IO import read
 
 parser = argparse.ArgumentParser(
     description='Main script for Catboost training')
@@ -12,8 +13,12 @@ filename = args.filename
 thrs = args.thrs
 thrs = float(thrs)
 
-log = pm4py.read_xes(filename)
-df = pm4py.convert_to_dataframe(log)
+if '.xes' in filename:
+    log = pm4py.read_xes(filename)
+    df = pm4py.convert_to_dataframe(log)
+elif '.csv' in filename:
+    df = read(filename)
+    
 df_cut = pd.DataFrame(columns=df.columns)
 for idx in df['case:concept:name'].unique():
     trace = df[df['case:concept:name']==idx].reset_index(drop=True)
