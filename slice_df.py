@@ -13,11 +13,8 @@ filename = args.filename
 thrs = args.thrs
 thrs = float(thrs)
 
-if '.xes' in filename:
-    log = pm4py.read_xes(filename)
-    df = pm4py.convert_to_dataframe(log)
-elif '.csv' in filename:
-    df = read(filename)
+log = pm4py.read_xes(filename)
+df = pm4py.convert_to_dataframe(log)
     
 df_cut = pd.DataFrame(columns=df.columns)
 for idx in df['case:concept:name'].unique():
